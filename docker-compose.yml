@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: joclinicsflows-db
+    environment:
+      POSTGRES_USER: ${DB_USER:-joclinics}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-secret}
+      POSTGRES_DB: ${DB_NAME:-joclinicsflows}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-joclinics}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: joclinicsflows-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  # whatsapp-mock:
+  #   image: wiremock/wiremock:3.3.1
+  #   container_name: joclinicsflows-whatsapp-mock
+  #   ports:
+  #     - "8080:8080"
+  #   volumes:
+  #     - ./mocks/whatsapp:/home/wiremock
+
+volumes:
+  postgres_data:
+  redis_data:

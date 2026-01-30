@@ -1,0 +1,405 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Clinic {
+  id                 String    @id @default(uuid()) @db.Uuid
+  name_ar            String
+  name_en            String?
+  subdomain          String    @unique
+  phone              String?
+  email              String?
+  address            String?
+  logo_url           String?
+  subscription_status String   @default("trial")
+  subscription_ends_at DateTime?
+  trial_ends_at      DateTime?
+  settings           Json      @default("{}")
+  timezone           String    @default("Asia/Amman")
+  created_at         DateTime  @default(now())
+  updated_at         DateTime  @updatedAt
+
+  users              User[]
+  patients           Patient[]
+  services           Service[]
+  appointments       Appointment[]
+  packages           Package[]
+  waitlist           Waitlist[]
+  working_hours      WorkingHours[]
+  blocked_slots      BlockedSlot[]
+  whatsapp_logs      WhatsappLog[]
+  audit_logs         AuditLog[]
+
+  @@map("clinics")
+}
+
+model User {
+  id            String   @id @default(uuid()) @db.Uuid
+  clinic_id     String   @db.Uuid
+  role          UserRole
+  email         String?
+  phone         String
+  password_hash String?
+  full_name_ar  String
+  full_name_en  String?
+  is_active     Boolean  @default(true)
+  last_login_at DateTime?
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  clinic        Clinic   @relation(fields: [clinic_id], references: [id], onDelete: Cascade)
+  appointments  Appointment[]
+  staff_services StaffService[]
+  working_hours WorkingHours[]
+  blocked_slots BlockedSlot[]
+  packages      Package[]
+  waitlist      Waitlist[]
+
+  @@unique([clinic_id, phone])
+  @@map("users")
+}
+
+model Patient {
+  id               String   @id @default(uuid()) @db.Uuid
+  clinic_id        String   @db.Uuid
+  full_name        String
+  phone            String
+  email            String?
+  date_of_birth    DateTime?
+  gender           Gender?
+  address          String?
+  notes            String?
+  whatsapp_opt_in  Boolean  @default(true)
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  clinic           Clinic   @relation(fields: [clinic_id], references: [id], onDelete: Cascade)
+  appointments     Appointment[]
+  packages         Package[]
+  waitlist         Waitlist[]
+  whatsapp_logs    WhatsappLog[]
+
+  @@unique([clinic_id, phone])
+  @@map("patients")
+}
+
+model Service {
+  id                 String   @id @default(uuid()) @db.Uuid
+  clinic_id          String   @db.Uuid
+  name_ar            String
+  name_en            String?
+  description        String?
+  duration_minutes   Int      @default(30)
+  price              Decimal? @db.Decimal(10, 2)
+  color              String   @default("#3B82F6")
+  is_active          Boolean  @default(true)
+  requires_doctor    Boolean  @default(false)
+  requires_technician Boolean @default(true)
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
+
+  clinic             Clinic   @relation(fields: [clinic_id], references: [id], onDelete: Cascade)
+  appointments       Appointment[]
+  packages           Package[]
+  waitlist           Waitlist[]
+  staff_services     StaffService[]
+
+  @@map("services")
+}
+
+model StaffService {
+  id          String   @id @default(uuid()) @db.Uuid
+  staff_id    String   @db.Uuid
+  service_id  String   @db.Uuid
+  created_at  DateTime @default(now())
+
+  staff       User     @relation(fields: [staff_id], references: [id], onDelete: Cascade)
+  service     Service  @relation(fields: [service_id], references: [id], onDelete: Cascade)
+
+  @@unique([staff_id, service_id])
+  @@map("staff_services")
+}
+
+model Appointment {
+  id                    String            @id @default(uuid()) @db.Uuid
+  clinic_id             String            @db.Uuid
+  patient_id            String            @db.Uuid
+  staff_id              String            @db.Uuid
+  service_id            String            @db.Uuid
+  
+  appointment_date      DateTime          @db.Date
+  start_time            DateTime          @db.Time
+  end_time              DateTime          @db.Time
+  
+  status                AppointmentStatus @default(confirmed)
+  appointment_type      AppointmentType   @default(single)
+  package_id            String?           @db.Uuid
+  package_session_number Int?
+  
+  notes                 String?
+  patient_notes         String?
+  internal_notes        String?
+  
+  source                String            @default("manual")
+  
+  reminder_24h_sent     Boolean           @default(false)
+  reminder_1h_sent      Boolean           @default(false)
+  confirmation_sent     Boolean           @default(false)
+  
+  created_by            String?           @db.Uuid
+  created_at            DateTime          @default(now())
+  updated_at            DateTime          @updatedAt
+
+  clinic                Clinic            @relation(fields: [clinic_id], references: [id], onDelete: Cascade)
+  patient               Patient           @relation(fields: [patient_id], references: [id], onDelete: Cascade)
+  staff                 User              @relation(fields: [staff_id], references: [id])
+  service               Service           @relation(fields: [service_id], references: [id])
+  filled_waitlist       Waitlist?
+  whatsapp_logs         WhatsappLog[]
+
+  @@index([clinic_id])
+  @@index([patient_id])
+  @@index([staff_id])
+  @@index([appointment_date])
+  @@index([status])
+  @@index([appointment_date, staff_id])
+  @@map("appointments")
+}
+
+model Package {
+  id                String        @id @default(uuid()) @db.Uuid
+  clinic_id         String        @db.Uuid
+  patient_id        String        @db.Uuid
+  service_id        String        @db.Uuid
+  staff_id          String        @db.Uuid
+  
+  name              String
+  total_sessions    Int
+  interval_days     Int           @default(28)
+  
+  total_price       Decimal?      @db.Decimal(10, 2)
+  price_per_session Decimal?      @db.Decimal(10, 2)
+  
+  status            PackageStatus @default(active)
+  
+  start_date        DateTime      @db.Date
+  expected_end_date DateTime?     @db.Date
+  completed_at      DateTime?
+  
+  notes             String?
+  created_by        String?       @db.Uuid
+  created_at        DateTime      @default(now())
+  updated_at        DateTime      @updatedAt
+
+  clinic            Clinic        @relation(fields: [clinic_id], references: [id], onDelete: Cascade)
+  patient           Patient       @relation(fields: [patient_id], references: [id], onDelete: Cascade)
+  service           Service       @relation(fields: [service_id], references: [id])
+  staff             User          @relation(fields: [staff_id], references: [id])
+  appointments      Appointment[]
+
+  @@index([clinic_id])
+  @@index([patient_id])
+  @@index([status])
+  @@map("packages")
+}
+
+model Waitlist {
+  id                    String          @id @default(uuid()) @db.Uuid
+  clinic_id             String          @db.Uuid
+  patient_id            String          @db.Uuid
+  service_id            String          @db.Uuid
+  preferred_staff_id    String?         @db.Uuid
+  
+  preferred_date_start  DateTime?       @db.Date
+  preferred_date_end    DateTime?       @db.Date
+  preferred_time_start  DateTime?       @db.Time
+  preferred_time_end    DateTime?       @db.Time
+  preferred_days_of_week Int[]
+  
+  status                WaitlistStatus  @default(active)
+  filled_appointment_id String?         @unique @db.Uuid
+  filled_at             DateTime?
+  
+  priority              Int             @default(0)
+  notes                 String?
+  
+  created_by            String?         @db.Uuid
+  created_at            DateTime        @default(now())
+  updated_at            DateTime        @updatedAt
+
+  clinic                Clinic          @relation(fields: [clinic_id], references: [id], onDelete: Cascade)
+  patient               Patient         @relation(fields: [patient_id], references: [id], onDelete: Cascade)
+  service               Service         @relation(fields: [service_id], references: [id])
+  preferred_staff       User?           @relation(fields: [preferred_staff_id], references: [id])
+  filled_appointment    Appointment?    @relation(fields: [filled_appointment_id], references: [id])
+
+  @@index([clinic_id])
+  @@index([patient_id])
+  @@index([status])
+  @@index([service_id])
+  @@map("waitlist")
+}
+
+model WhatsappLog {
+  id                  String    @id @default(uuid()) @db.Uuid
+  clinic_id           String    @db.Uuid
+  patient_id          String?   @db.Uuid
+  phone               String
+  
+  message_type        String
+  direction           Direction
+  content             String
+  media_url           String?
+  
+  status              MessageStatus @default(pending)
+  external_message_id String?
+  error_message       String?
+  
+  appointment_id      String?   @db.Uuid
+  
+  sent_at             DateTime?
+  delivered_at        DateTime?
+  read_at             DateTime?
+  created_at          DateTime  @default(now())
+
+  clinic              Clinic    @relation(fields: [clinic_id], references: [id], onDelete: Cascade)
+  patient             Patient?  @relation(fields: [patient_id], references: [id])
+  appointment         Appointment? @relation(fields: [appointment_id], references: [id])
+
+  @@index([clinic_id])
+  @@index([patient_id])
+  @@index([phone])
+  @@index([created_at])
+  @@map("whatsapp_logs")
+}
+
+model WorkingHours {
+  id          String    @id @default(uuid()) @db.Uuid
+  clinic_id   String    @db.Uuid
+  staff_id    String?   @db.Uuid
+  
+  day_of_week Int       // 0 = Sunday
+  is_working  Boolean   @default(true)
+  
+  open_time   DateTime? @db.Time
+  close_time  DateTime? @db.Time
+  break_start DateTime? @db.Time
+  break_end   DateTime? @db.Time
+  
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+
+  clinic      Clinic    @relation(fields: [clinic_id], references: [id], onDelete: Cascade)
+  staff       User?     @relation(fields: [staff_id], references: [id], onDelete: Cascade)
+
+  @@unique([clinic_id, staff_id, day_of_week])
+  @@map("working_hours")
+}
+
+model BlockedSlot {
+  id              String    @id @default(uuid()) @db.Uuid
+  clinic_id       String    @db.Uuid
+  staff_id        String?   @db.Uuid
+  
+  block_date      DateTime  @db.Date
+  start_time      DateTime  @db.Time
+  end_time        DateTime  @db.Time
+  
+  reason          String?
+  is_recurring    Boolean   @default(false)
+  recurring_until DateTime? @db.Date
+  
+  created_by      String?   @db.Uuid
+  created_at      DateTime  @default(now())
+
+  clinic          Clinic    @relation(fields: [clinic_id], references: [id], onDelete: Cascade)
+  staff           User?     @relation(fields: [staff_id], references: [id], onDelete: Cascade)
+
+  @@index([clinic_id])
+  @@index([staff_id])
+  @@index([block_date])
+  @@map("blocked_slots")
+}
+
+model AuditLog {
+  id            String    @id @default(uuid()) @db.Uuid
+  clinic_id     String    @db.Uuid
+  user_id       String?   @db.Uuid
+  patient_id    String?   @db.Uuid
+  appointment_id String?  @db.Uuid
+  
+  action        String
+  entity_type   String
+  entity_id     String    @db.Uuid
+  
+  old_values    Json?
+  new_values    Json?
+  
+  ip_address    String?
+  user_agent    String?
+  created_at    DateTime  @default(now())
+
+  clinic        Clinic    @relation(fields: [clinic_id], references: [id], onDelete: Cascade)
+
+  @@index([clinic_id])
+  @@index([created_at])
+  @@map("audit_logs")
+}
+
+enum UserRole {
+  admin
+  doctor
+  technician
+  secretary
+}
+
+enum Gender {
+  male
+  female
+}
+
+enum AppointmentStatus {
+  pending
+  confirmed
+  completed
+  no_show
+  cancelled_by_patient
+  cancelled_by_clinic
+}
+
+enum AppointmentType {
+  single
+  package
+}
+
+enum PackageStatus {
+  active
+  completed
+  cancelled
+  paused
+}
+
+enum WaitlistStatus {
+  active
+  filled
+  expired
+  cancelled
+}
+
+enum Direction {
+  outgoing
+  incoming
+}
+
+enum MessageStatus {
+  pending
+  sent
+  delivered
+  read
+  failed
+}
