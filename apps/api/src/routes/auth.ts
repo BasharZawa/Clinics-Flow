@@ -14,7 +14,7 @@ router.post('/login', async (req, res, next) => {
       throw new AppError('Phone and password are required', 400);
     }
 
-    const user = await prisma.users.findFirst({
+    const user = await prisma.user.findFirst({
       where: { phone },
       include: { clinic: true },
     });
@@ -34,7 +34,7 @@ router.post('/login', async (req, res, next) => {
     }
 
     // Update last login
-    await prisma.users.update({
+    await prisma.user.update({
       where: { id: user.id },
       data: { last_login_at: new Date() },
     });
@@ -82,7 +82,7 @@ router.post('/register', async (req, res, next) => {
     } = req.body;
 
     // Check if phone already exists
-    const existingUser = await prisma.users.findFirst({
+    const existingUser = await prisma.user.findFirst({
       where: { phone: adminPhone },
     });
 
@@ -91,7 +91,7 @@ router.post('/register', async (req, res, next) => {
     }
 
     // Create clinic
-    const clinic = await prisma.clinics.create({
+    const clinic = await prisma.clinic.create({
       data: {
         name_ar: clinicNameAr,
         name_en: clinicNameEn,
@@ -106,7 +106,7 @@ router.post('/register', async (req, res, next) => {
     // Create admin user
     const hashedPassword = await hashPassword(adminPassword);
 
-    const user = await prisma.users.create({
+    const user = await prisma.user.create({
       data: {
         clinic_id: clinic.id,
         role: 'admin',

@@ -159,6 +159,7 @@ model Appointment {
   patient               Patient           @relation(fields: [patient_id], references: [id], onDelete: Cascade)
   staff                 User              @relation(fields: [staff_id], references: [id])
   service               Service           @relation(fields: [service_id], references: [id])
+  package               Package?          @relation(fields: [package_id], references: [id])
   filled_waitlist       Waitlist?
   whatsapp_logs         WhatsappLog[]
 
@@ -386,6 +387,7 @@ enum PackageStatus {
 
 enum WaitlistStatus {
   active
+  offered
   filled
   expired
   cancelled

@@ -16,7 +16,8 @@ export class WhatsAppService {
   async sendMessage(
     phone: string,
     message: string,
-    type: string = 'manual'
+    type: string = 'manual',
+    clinicId?: string
   ): Promise<{ messageId: string }> {
     if (!WHATSAPP_ACCESS_TOKEN || !WHATSAPP_PHONE_NUMBER_ID) {
       throw new Error('WhatsApp credentials not configured');
@@ -43,31 +44,37 @@ export class WhatsAppService {
       const messageId = response.data.messages?.[0]?.id;
 
       // Log the message
-      await prisma.whatsapp_logs.create({
-        data: {
-          phone,
-          message_type: type,
-          direction: 'outgoing',
-          content: message,
-          status: 'sent',
-          external_message_id: messageId,
-          sent_at: new Date(),
-        },
-      });
+      if (clinicId) {
+        await prisma.whatsappLog.create({
+          data: {
+            clinic_id: clinicId,
+            phone,
+            message_type: type,
+            direction: 'outgoing',
+            content: message,
+            status: 'sent',
+            external_message_id: messageId,
+            sent_at: new Date(),
+          },
+        });
+      }
 
       return { messageId };
     } catch (error: any) {
       // Log failed message
-      await prisma.whatsapp_logs.create({
-        data: {
-          phone,
-          message_type: type,
-          direction: 'outgoing',
-          content: message,
-          status: 'failed',
-          error_message: error.message,
-        },
-      });
+      if (clinicId) {
+        await prisma.whatsappLog.create({
+          data: {
+            clinic_id: clinicId,
+            phone,
+            message_type: type,
+            direction: 'outgoing',
+            content: message,
+            status: 'failed',
+            error_message: error.message,
+          },
+        });
+      }
 
       throw new Error(`Failed to send WhatsApp message: ${error.message}`);
     }
@@ -79,8 +86,8 @@ export class WhatsAppService {
     appointment: {
       appointment_date: Date;
       start_time: Date;
-      services: { name_ar: string };
-      users: { full_name_ar: string };
+      service: { name_ar: string };
+      staff: { full_name_ar: string };
     }
   ): Promise<void> {
     const message = `
@@ -89,8 +96,8 @@ export class WhatsAppService {
 تم تأكيد حجزك:
 📅 التاريخ: ${format(appointment.appointment_date, 'yyyy-MM-dd')}
 ⏰ الوقت: ${format(appointment.start_time, 'HH:mm')}
-💆 الخدمة: ${appointment.services.name_ar}
-👨‍⚕️ المختص: ${appointment.users.full_name_ar}
+💆 الخدمة: ${appointment.service.name_ar}
+👨‍⚕️ المختص: ${appointment.staff.full_name_ar}
 
 للإلغاء، رد بـ "إلغاء"
 `.trim();
@@ -103,7 +110,7 @@ export class WhatsAppService {
     appointment: {
       appointment_date: Date;
       start_time: Date;
-      services: { name_ar: string };
+      service: { name_ar: string };
     }
   ): Promise<void> {
     const message = `
@@ -111,7 +118,7 @@ export class WhatsAppService {
 
 📅 ${format(appointment.appointment_date, 'yyyy-MM-dd')}
 ⏰ ${format(appointment.start_time, 'HH:mm')}
-💆 ${appointment.services.name_ar}
+💆 ${appointment.service.name_ar}
 
 نراكم غداً! 😊
 
@@ -126,13 +133,13 @@ export class WhatsAppService {
     appointment: {
       appointment_date: Date;
       start_time: Date;
-      services: { name_ar: string };
+      service: { name_ar: string };
     }
   ): Promise<void> {
     const message = `
 ⏰⏰ موعدك بعد ساعة!
 
-💆 ${appointment.services.name_ar}
+💆 ${appointment.service.name_ar}
 ⏰ ${format(appointment.start_time, 'HH:mm')}
 
 نراكم قريباً! 🌟
@@ -166,25 +173,31 @@ export class WhatsAppService {
     await this.sendMessage(phone, message, 'waitlist_offer');
   }
 
-  async processIncomingMessage(payload: {
-    from: string;
-    body: string;
-    messageId: string;
-    context?: { id: string };
-  }): Promise<{ type: string; response: string }> {
+  async processIncomingMessage(
+    payload: {
+      from: string;
+      body: string;
+      messageId: string;
+      context?: { id: string };
+    },
+    clinicId?: string
+  ): Promise<{ type: string; response: string }> {
     const { from, body, context } = payload;
     const normalizedBody = body.trim().toLowerCase();
 
     // Log incoming message
-    await prisma.whatsapp_logs.create({
-      data: {
-        phone: from,
-        message_type: 'incoming',
-        direction: 'incoming',
-        content: body,
-        status: 'delivered',
-      },
-    });
+    if (clinicId) {
+      await prisma.whatsappLog.create({
+        data: {
+          clinic_id: clinicId,
+          phone: from,
+          message_type: 'incoming',
+          direction: 'incoming',
+          content: body,
+          status: 'delivered',
+        },
+      });
+    }
 
     // Handle booking intent
     if (
@@ -254,7 +267,7 @@ export class WhatsAppService {
 
   async getMessageStatus(messageId: string): Promise<string> {
     // This would check the database for the message status
-    const log = await prisma.whatsapp_logs.findFirst({
+    const log = await prisma.whatsappLog.findFirst({
       where: { external_message_id: messageId },
     });
 

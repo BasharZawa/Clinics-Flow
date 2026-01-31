@@ -22,7 +22,7 @@ export class WaitlistService {
     data: AddToWaitlistInput
   ) {
     // Verify patient
-    const patient = await prisma.patients.findFirst({
+    const patient = await prisma.patient.findFirst({
       where: { id: data.patientId, clinic_id: clinicId },
     });
 
@@ -31,7 +31,7 @@ export class WaitlistService {
     }
 
     // Verify service
-    const service = await prisma.services.findFirst({
+    const service = await prisma.service.findFirst({
       where: { id: data.serviceId, clinic_id: clinicId },
     });
 
@@ -60,8 +60,8 @@ export class WaitlistService {
         status: 'active',
       },
       include: {
-        patients: { select: { id: true, full_name: true, phone: true } },
-        services: { select: { id: true, name_ar: true } },
+        patient: { select: { id: true, full_name: true, phone: true } },
+        service: { select: { id: true, name_ar: true } },
       },
     });
   }
@@ -85,31 +85,41 @@ export class WaitlistService {
         clinic_id: clinicId,
         status: 'active',
         service_id: cancelledAppointment.service_id,
-        OR: [
-          { preferred_staff_id: null },
-          { preferred_staff_id: cancelledAppointment.staff_id },
-        ],
-        OR: [
-          { preferred_date_start: null },
+        AND: [
           {
-            preferred_date_start: { lte: cancelledAppointment.appointment_date },
-            preferred_date_end: { gte: cancelledAppointment.appointment_date },
+            OR: [
+              { preferred_staff_id: null },
+              { preferred_staff_id: cancelledAppointment.staff_id },
+            ],
           },
-        ],
-        OR: [
-          { preferred_time_start: null },
           {
-            preferred_time_start: { lte: cancelledAppointment.start_time },
-            preferred_time_end: { gte: cancelledAppointment.end_time },
+            OR: [
+              { preferred_date_start: null },
+              {
+                preferred_date_start: { lte: cancelledAppointment.appointment_date },
+                preferred_date_end: { gte: cancelledAppointment.appointment_date },
+              },
+            ],
           },
-        ],
-        OR: [
-          { preferred_days_of_week: { isEmpty: true } },
-          { preferred_days_of_week: { has: dayOfWeek } },
+          {
+            OR: [
+              { preferred_time_start: null },
+              {
+                preferred_time_start: { lte: cancelledAppointment.start_time },
+                preferred_time_end: { gte: cancelledAppointment.end_time },
+              },
+            ],
+          },
+          {
+            OR: [
+              { preferred_days_of_week: { isEmpty: true } },
+              { preferred_days_of_week: { has: dayOfWeek } },
+            ],
+          },
         ],
       },
       include: {
-        patients: { select: { full_name: true, phone: true } },
+        patient: { select: { full_name: true, phone: true } },
       },
       orderBy: [{ priority: 'desc' }, { created_at: 'asc' }],
       take: 1,
@@ -135,7 +145,7 @@ export class WaitlistService {
 
     // TODO: Send WhatsApp notification
     console.log(
-      `Offering slot to ${match.patients.full_name} at ${match.patients.phone}`
+      `Offering slot to ${match.patient.full_name} at ${match.patient.phone}`
     );
 
     return true;
@@ -154,8 +164,8 @@ export class WaitlistService {
         status: 'offered',
       },
       include: {
-        patients: true,
-        services: true,
+        patient: true,
+        service: true,
       },
     });
 
@@ -169,15 +179,15 @@ export class WaitlistService {
 
     const startTime = parse(time, 'HH:mm', new Date());
     const endTime = new Date(
-      startTime.getTime() + waitlistEntry.services.duration_minutes * 60000
+      startTime.getTime() + waitlistEntry.service.duration_minutes * 60000
     );
 
     // Create appointment
-    const appointment = await prisma.appointments.create({
+    const appointment = await prisma.appointment.create({
       data: {
         clinic_id: clinicId,
         patient_id: waitlistEntry.patient_id,
-        staff_id: waitlistEntry.preferred_staff_id || waitlistEntry.services.id,
+        staff_id: waitlistEntry.preferred_staff_id || waitlistEntry.service_id,
         service_id: waitlistEntry.service_id,
         appointment_date: date,
         start_time: startTime,
@@ -221,9 +231,9 @@ export class WaitlistService {
       prisma.waitlist.findMany({
         where,
         include: {
-          patients: { select: { id: true, full_name: true, phone: true } },
-          services: { select: { id: true, name_ar: true } },
-          users: { select: { id: true, full_name_ar: true } },
+          patient: { select: { id: true, full_name: true, phone: true } },
+          service: { select: { id: true, name_ar: true } },
+          preferred_staff: { select: { id: true, full_name_ar: true } },
           filled_appointment: {
             select: { appointment_date: true, start_time: true },
           },

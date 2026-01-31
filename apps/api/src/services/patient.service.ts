@@ -14,7 +14,7 @@ export interface CreatePatientInput {
 export class PatientService {
   async createPatient(clinicId: string, data: CreatePatientInput) {
     // Check if patient already exists
-    const existing = await prisma.patients.findFirst({
+    const existing = await prisma.patient.findFirst({
       where: {
         clinic_id: clinicId,
         phone: data.phone,
@@ -29,7 +29,7 @@ export class PatientService {
       );
     }
 
-    return prisma.patients.create({
+    return prisma.patient.create({
       data: {
         clinic_id: clinicId,
         full_name: data.fullName,
@@ -44,7 +44,7 @@ export class PatientService {
   }
 
   async searchPatients(clinicId: string, query: string, limit: number = 20) {
-    return prisma.patients.findMany({
+    return prisma.patient.findMany({
       where: {
         clinic_id: clinicId,
         OR: [
@@ -59,7 +59,7 @@ export class PatientService {
   }
 
   async getPatientById(clinicId: string, patientId: string) {
-    const patient = await prisma.patients.findFirst({
+    const patient = await prisma.patient.findFirst({
       where: { id: patientId, clinic_id: clinicId },
     });
 
@@ -71,19 +71,19 @@ export class PatientService {
   }
 
   async getPatientHistory(clinicId: string, patientId: string) {
-    const patient = await prisma.patients.findFirst({
+    const patient = await prisma.patient.findFirst({
       where: { id: patientId, clinic_id: clinicId },
       include: {
         appointments: {
           include: {
-            services: { select: { name_ar: true, name_en: true } },
-            users: { select: { full_name_ar: true } },
+            service: { select: { name_ar: true, name_en: true } },
+            staff: { select: { full_name_ar: true } },
           },
           orderBy: { appointment_date: 'desc' },
         },
         packages: {
           include: {
-            services: { select: { name_ar: true } },
+            service: { select: { name_ar: true } },
           },
           orderBy: { created_at: 'desc' },
         },
@@ -102,7 +102,7 @@ export class PatientService {
     patientId: string,
     data: Partial<CreatePatientInput>
   ) {
-    const patient = await prisma.patients.findFirst({
+    const patient = await prisma.patient.findFirst({
       where: { id: patientId, clinic_id: clinicId },
     });
 
@@ -112,7 +112,7 @@ export class PatientService {
 
     // Check phone uniqueness if changing phone
     if (data.phone && data.phone !== patient.phone) {
-      const existing = await prisma.patients.findFirst({
+      const existing = await prisma.patient.findFirst({
         where: {
           clinic_id: clinicId,
           phone: data.phone,
@@ -129,7 +129,7 @@ export class PatientService {
       }
     }
 
-    return prisma.patients.update({
+    return prisma.patient.update({
       where: { id: patientId },
       data: {
         full_name: data.fullName,
@@ -161,13 +161,13 @@ export class PatientService {
     }
 
     const [patients, total] = await Promise.all([
-      prisma.patients.findMany({
+      prisma.patient.findMany({
         where,
         orderBy: { created_at: 'desc' },
         skip,
         take: limit,
       }),
-      prisma.patients.count({ where }),
+      prisma.patient.count({ where }),
     ]);
 
     return {

@@ -35,7 +35,7 @@ export class AppointmentService {
     data: CreateAppointmentInput
   ) {
     // Verify patient belongs to clinic
-    const patient = await prisma.patients.findFirst({
+    const patient = await prisma.patient.findFirst({
       where: { id: data.patientId, clinic_id: clinicId },
     });
 
@@ -57,7 +57,7 @@ export class AppointmentService {
     }
 
     // Create appointment
-    const appointment = await prisma.appointments.create({
+    const appointment = await prisma.appointment.create({
       data: {
         clinic_id: clinicId,
         patient_id: data.patientId,
@@ -74,9 +74,9 @@ export class AppointmentService {
         created_by: userId,
       },
       include: {
-        patients: true,
-        services: true,
-        users: true,
+        patient: true,
+        service: true,
+        staff: true,
       },
     });
 
@@ -89,7 +89,7 @@ export class AppointmentService {
     data: CreatePackageInput
   ) {
     // Verify patient exists
-    const patient = await prisma.patients.findFirst({
+    const patient = await prisma.patient.findFirst({
       where: { id: data.patientId, clinic_id: clinicId },
     });
 
@@ -98,7 +98,7 @@ export class AppointmentService {
     }
 
     // Get service duration
-    const service = await prisma.services.findFirst({
+    const service = await prisma.service.findFirst({
       where: { id: data.serviceId, clinic_id: clinicId },
     });
 
@@ -113,7 +113,7 @@ export class AppointmentService {
     );
 
     // Create package
-    const pkg = await prisma.packages.create({
+    const pkg = await prisma.package.create({
       data: {
         clinic_id: clinicId,
         patient_id: data.patientId,
@@ -144,7 +144,7 @@ export class AppointmentService {
     for (let i = 0; i < data.totalSessions; i++) {
       const sessionDate = addDays(data.startDate, i * data.intervalDays);
 
-      const appointment = await prisma.appointments.create({
+      const appointment = await prisma.appointment.create({
         data: {
           clinic_id: clinicId,
           patient_id: data.patientId,
@@ -173,9 +173,9 @@ export class AppointmentService {
     reason: 'cancelled_by_patient' | 'cancelled_by_clinic',
     checkWaitlist: boolean = false
   ) {
-    const appointment = await prisma.appointments.findFirst({
+    const appointment = await prisma.appointment.findFirst({
       where: { id: appointmentId, clinic_id: clinicId },
-      include: { patients: true },
+      include: { patient: true },
     });
 
     if (!appointment) {
@@ -186,10 +186,10 @@ export class AppointmentService {
       throw new AppError('Appointment cannot be cancelled', 400, 'INVALID_STATUS');
     }
 
-    const updated = await prisma.appointments.update({
+    const updated = await prisma.appointment.update({
       where: { id: appointmentId },
       data: { status: reason },
-      include: { patients: true, services: true, users: true },
+      include: { patient: true, service: true, staff: true },
     });
 
     // TODO: Check waitlist and fill if needed
@@ -206,7 +206,7 @@ export class AppointmentService {
     staffId: string,
     serviceId: string
   ): Promise<{ start: string; end: string }[]> {
-    const service = await prisma.services.findFirst({
+    const service = await prisma.service.findFirst({
       where: { id: serviceId, clinic_id: clinicId },
     });
 
@@ -217,7 +217,7 @@ export class AppointmentService {
     const dayOfWeek = date.getDay();
 
     // Get working hours
-    const workingHours = await prisma.working_hours.findFirst({
+    const workingHours = await prisma.workingHours.findFirst({
       where: {
         clinic_id: clinicId,
         staff_id: staffId,
@@ -231,7 +231,7 @@ export class AppointmentService {
     }
 
     // Get existing appointments
-    const existingAppointments = await prisma.appointments.findMany({
+    const existingAppointments = await prisma.appointment.findMany({
       where: {
         clinic_id: clinicId,
         staff_id: staffId,
@@ -242,7 +242,7 @@ export class AppointmentService {
     });
 
     // Get blocked slots
-    const blockedSlots = await prisma.blocked_slots.findMany({
+    const blockedSlots = await prisma.blockedSlot.findMany({
       where: {
         clinic_id: clinicId,
         staff_id: staffId,
@@ -292,7 +292,7 @@ export class AppointmentService {
     const startDateTime = parse(startTime, 'HH:mm', date);
     const endDateTime = parse(endTime, 'HH:mm', date);
 
-    const existing = await prisma.appointments.findFirst({
+    const existing = await prisma.appointment.findFirst({
       where: {
         clinic_id: clinicId,
         staff_id: staffId,
@@ -345,18 +345,18 @@ export class AppointmentService {
     if (filters.status) where.status = filters.status;
 
     const [appointments, total] = await Promise.all([
-      prisma.appointments.findMany({
+      prisma.appointment.findMany({
         where,
         include: {
-          patients: { select: { id: true, full_name: true, phone: true } },
-          users: { select: { id: true, full_name_ar: true, role: true } },
-          services: { select: { id: true, name_ar: true, duration_minutes: true } },
+          patient: { select: { id: true, full_name: true, phone: true } },
+          staff: { select: { id: true, full_name_ar: true, role: true } },
+          service: { select: { id: true, name_ar: true, duration_minutes: true } },
         },
         orderBy: { appointment_date: 'desc' },
         skip,
         take: limit,
       }),
-      prisma.appointments.count({ where }),
+      prisma.appointment.count({ where }),
     ]);
 
     return {
@@ -371,13 +371,13 @@ export class AppointmentService {
   }
 
   async getAppointmentById(clinicId: string, appointmentId: string) {
-    const appointment = await prisma.appointments.findFirst({
+    const appointment = await prisma.appointment.findFirst({
       where: { id: appointmentId, clinic_id: clinicId },
       include: {
-        patients: true,
-        users: { select: { id: true, full_name_ar: true, role: true } },
-        services: true,
-        packages: true,
+        patient: true,
+        staff: { select: { id: true, full_name_ar: true, role: true } },
+        service: true,
+        package: true,
       },
     });
 
@@ -393,7 +393,7 @@ export class AppointmentService {
     appointmentId: string,
     status: string
   ) {
-    const appointment = await prisma.appointments.findFirst({
+    const appointment = await prisma.appointment.findFirst({
       where: { id: appointmentId, clinic_id: clinicId },
     });
 
@@ -401,12 +401,12 @@ export class AppointmentService {
       throw new AppError('Appointment not found', 404, 'APPOINTMENT_NOT_FOUND');
     }
 
-    return prisma.appointments.update({
+    return prisma.appointment.update({
       where: { id: appointmentId },
       data: { status: status as any },
       include: {
-        patients: { select: { id: true, full_name: true, phone: true } },
-        services: { select: { id: true, name_ar: true } },
+        patient: { select: { id: true, full_name: true, phone: true } },
+        service: { select: { id: true, name_ar: true } },
       },
     });
   }
