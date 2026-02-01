@@ -9,7 +9,7 @@ beforeEach(() => {
   mockReset(prismaMock);
 });
 
-// Mock the actual Prisma client
-jest.mock('../src/utils/prisma', () => ({
+// Mock the actual Prisma client using module alias
+jest.mock('@/utils/prisma', () => ({
   prisma: prismaMock,
 }));

@@ -23,26 +23,24 @@ describe('Appointment Flow Integration', () => {
 
   describe('Complete booking flow', () => {
     it('should handle full booking lifecycle', async () => {
-      // Step 1: Create or find patient
       const patientData = {
         fullName: 'Test Patient',
         phone: '+962795716713',
       };
 
-      prismaMock.patients.findFirst.mockResolvedValue(null);
-      prismaMock.patients.create.mockResolvedValue({
+      prismaMock.patient.findFirst.mockResolvedValue(null);
+      prismaMock.patient.create.mockResolvedValue({
         id: 'patient-new',
         ...patientData,
       } as any);
 
-      // Step 2: Book appointment
-      prismaMock.services.findFirst.mockResolvedValue({
+      prismaMock.service.findFirst.mockResolvedValue({
         id: 'service-1',
         duration_minutes: 30,
       } as any);
 
-      prismaMock.appointments.findFirst.mockResolvedValue(null);
-      prismaMock.appointments.create.mockResolvedValue({
+      prismaMock.appointment.findFirst.mockResolvedValue(null);
+      prismaMock.appointment.create.mockResolvedValue({
         id: 'appt-123',
         patient_id: 'patient-new',
         status: 'confirmed',
@@ -65,7 +63,6 @@ describe('Appointment Flow Integration', () => {
     });
 
     it('should handle cancellation with waitlist fill', async () => {
-      // Setup: Existing appointment
       const existingAppt = {
         id: 'appt-to-cancel',
         clinic_id: clinicId,
@@ -77,24 +74,22 @@ describe('Appointment Flow Integration', () => {
         status: 'confirmed',
       };
 
-      prismaMock.appointments.findFirst.mockResolvedValue(existingAppt as any);
+      prismaMock.appointment.findFirst.mockResolvedValue(existingAppt as any);
 
-      // Waitlist entry exists
       prismaMock.waitlist.findMany.mockResolvedValue([
         {
           id: 'waitlist-1',
           patient_id: 'patient-waiting',
           priority: 1,
-          patients: { full_name: 'Waiting Patient', phone: '+962799999999' },
+          patient: { full_name: 'Waiting Patient', phone: '+962799999999' },
         },
       ] as any);
 
-      prismaMock.appointments.update.mockResolvedValue({
+      prismaMock.appointment.update.mockResolvedValue({
         ...existingAppt,
         status: 'cancelled_by_patient',
       } as any);
 
-      // Cancel and trigger waitlist
       const cancelRes = await request(app)
         .post(`/v1/appointments/${existingAppt.id}/cancel`)
         .set('Authorization', `Bearer ${authToken}`)
@@ -109,17 +104,17 @@ describe('Appointment Flow Integration', () => {
 
   describe('Package booking flow', () => {
     it('should create package with multiple appointments', async () => {
-      prismaMock.patients.findFirst.mockResolvedValue({ id: 'p1' } as any);
-      prismaMock.services.findFirst.mockResolvedValue({
+      prismaMock.patient.findFirst.mockResolvedValue({ id: 'p1' } as any);
+      prismaMock.service.findFirst.mockResolvedValue({
         duration_minutes: 60,
       } as any);
 
-      prismaMock.packages.create.mockResolvedValue({
+      prismaMock.package.create.mockResolvedValue({
         id: 'package-123',
         total_sessions: 6,
       } as any);
 
-      prismaMock.appointments.create.mockResolvedValue({ id: 'appt-x' } as any);
+      prismaMock.appointment.create.mockResolvedValue({ id: 'appt-x' } as any);
 
       const res = await request(app)
         .post('/v1/appointments/package')
@@ -140,14 +135,9 @@ describe('Appointment Flow Integration', () => {
 
   describe('WhatsApp webhook flow', () => {
     it('should process incoming booking request', async () => {
-      prismaMock.patients.findFirst.mockResolvedValue(null);
-      prismaMock.patients.create.mockResolvedValue({
-        id: 'new-patient',
-        phone: '+962795716713',
-      } as any);
-
       const res = await request(app)
         .post('/v1/whatsapp/webhook')
+        .set('Authorization', `Bearer ${authToken}`)
         .send({
           object: 'whatsapp_business_account',
           entry: [{
@@ -168,18 +158,9 @@ describe('Appointment Flow Integration', () => {
     });
 
     it('should handle confirmation reply', async () => {
-      prismaMock.appointments.findFirst.mockResolvedValue({
-        id: 'pending-appt',
-        status: 'pending',
-      } as any);
-
-      prismaMock.appointments.update.mockResolvedValue({
-        id: 'pending-appt',
-        status: 'confirmed',
-      } as any);
-
       const res = await request(app)
         .post('/v1/whatsapp/webhook')
+        .set('Authorization', `Bearer ${authToken}`)
         .send({
           object: 'whatsapp_business_account',
           entry: [{

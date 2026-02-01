@@ -26,8 +26,8 @@ describe('PatientService', () => {
         notes: 'حساسية',
       };
 
-      prismaMock.patients.findFirst.mockResolvedValue(null); // Not exists
-      prismaMock.patients.create.mockResolvedValue({
+      prismaMock.patient.findFirst.mockResolvedValue(null);
+      prismaMock.patient.create.mockResolvedValue({
         id: 'patient-123',
         ...patientData,
       } as any);
@@ -39,7 +39,7 @@ describe('PatientService', () => {
     });
 
     it('should throw error if phone already exists', async () => {
-      prismaMock.patients.findFirst.mockResolvedValue({
+      prismaMock.patient.findFirst.mockResolvedValue({
         id: 'existing-patient',
       } as any);
 
@@ -54,7 +54,7 @@ describe('PatientService', () => {
 
   describe('searchPatients', () => {
     it('should search by name', async () => {
-      prismaMock.patients.findMany.mockResolvedValue([
+      prismaMock.patient.findMany.mockResolvedValue([
         { id: 'p1', full_name: 'محمد أحمد', phone: '+111' },
         { id: 'p2', full_name: 'محمد خالد', phone: '+222' },
       ] as any);
@@ -65,7 +65,7 @@ describe('PatientService', () => {
     });
 
     it('should search by phone', async () => {
-      prismaMock.patients.findMany.mockResolvedValue([
+      prismaMock.patient.findMany.mockResolvedValue([
         { id: 'p1', full_name: 'Test', phone: '+962795716713' },
       ] as any);
 
@@ -77,11 +77,11 @@ describe('PatientService', () => {
 
   describe('getPatientHistory', () => {
     it('should return patient with full history', async () => {
-      prismaMock.patients.findFirst.mockResolvedValue({
+      prismaMock.patient.findFirst.mockResolvedValue({
         id: 'patient-123',
         full_name: 'محمد',
         appointments: [
-          { id: 'a1', status: 'completed', services: { name_ar: 'ليزر' } },
+          { id: 'a1', status: 'completed', service: { name_ar: 'ليزر' } },
         ],
         packages: [
           { id: 'pkg1', name: 'حزمة 1', status: 'active' },

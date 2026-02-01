@@ -14,6 +14,7 @@ import appointmentRoutes from './routes/appointments';
 import patientRoutes from './routes/patients';
 import waitlistRoutes from './routes/waitlist';
 import whatsappRoutes from './routes/whatsapp';
+import dashboardRoutes from './routes/dashboard';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -39,6 +40,7 @@ app.use('/v1/appointments', appointmentRoutes);
 app.use('/v1/patients', patientRoutes);
 app.use('/v1/waitlist', waitlistRoutes);
 app.use('/v1/whatsapp', whatsappRoutes);
+app.use('/v1/dashboard', dashboardRoutes);
 
 // Error handling
 app.use(notFoundHandler);
